@@ -22,8 +22,8 @@ class DateProcessor(object):
     ''' Process the date information for `PageParser` to use
     '''
     @staticmethod
-    def tostr(date):
-        '''
+    def to_str(date):
+        ''' to the string format such as `08/19/2014`
         :param date datetime.date
         '''
         assert isinstance(date, datetime.date)
@@ -31,7 +31,7 @@ class DateProcessor(object):
     @staticmethod
     def get_date_before(daysago):
         '''
-        :param daysago int, days before
+        :param daysago, days before 
         '''
         assert isinstance(daysago, int)
         daysdelta = datetime.timedelta(daysago)
@@ -49,6 +49,7 @@ class PageParser(object):
     METHOD = 'post'
     X_Requested_With = 'XMLHttpRequest'
     Content_Type =  'application/x-www-form-urlencoded' 
+    
     def __init__(self, st_date=None, end_date=None, interval_sec=None, curr_id=None, action=None):
         if interval_sec is None or interval_sec not in (Period.Daily, Period.Weekly, Period.Monthly):
             interval_sec = Period.Daily
@@ -57,9 +58,9 @@ class PageParser(object):
         if action is None:
             action = 'historical_data'
         if end_date is None:
-            end_date = DateProcessor.tostr(datetime.date.today())
+            end_date = DateProcessor.to_str(datetime.date.today())
         if st_date is None:
-            st_date = DateProcessor.tostr(DateProcessor.get_date_before(30))
+            st_date = DateProcessor.to_str(DateProcessor.get_date_before(30))
         self.postdict = {'action':action,
                          'curr_id':curr_id,
                          'st_date':st_date,
@@ -88,8 +89,12 @@ class PageParser(object):
                 return response.read()
             except Exception as e:
                 raise e
-        pass
+
     def write_to_html(self, htmlstr, filepath=None):
+        '''
+        :param htmlstr, html source returned from `get_html`
+        :param filepath, (optional), the saved html file path
+        '''
         htmlfilename = "%s-%s-%s" % (self.postdict['st_date'], self.postdict['end_date'], self.postdict['interval_sec'])
         htmldoc = """<!doctype html>
                     <html>
@@ -106,6 +111,9 @@ class PageParser(object):
         logger.info("write data to %s" % (filepath,))
         
     def extract_info(self, htmlstr):
+        '''
+        :param htmlstr, html source returned from `get_html`
+        '''
         try:
             import lxml.html.soupparser as soupparser
         except ImportError as e:
@@ -123,6 +131,10 @@ class PageParser(object):
         return {'data':{'titles':ths, 'values':data}, 'stats':{'titles':statistic_headers, 'values':statistic_values}} 
                
     def write_to_csv(self, info, csvfilepath=None):
+        '''write the info extracted from the website to file not including the statistics information
+        :param info, extracted from `extract_info`
+        :param csvfilepath, (optional) csv saved file path
+        '''
         import csv        
         if csvfilepath is None:
             htmlfilename = "%s-%s-%s" % (self.postdict['st_date'], self.postdict['end_date'], self.postdict['interval_sec'])
