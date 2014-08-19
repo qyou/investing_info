@@ -1,15 +1,15 @@
 #!/usr/bin/python
 '''
-@author: qyou@nlpr.ia.ac.cn
+@author: qyou
 
-TODO: implement the methods in PageParser
+Prequisites:
+    <a href='http://lxml.de/'>lxml- XML and HTML with Python </a>
 '''
 import logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger('investing')
 
 HAS_REQUESTS = False
-
 try:
     import requests
     HAS_REQEUSTS = True
@@ -17,6 +17,7 @@ except ImportError:
     pass
 
 import datetime
+
 class DateProcessor(object):
     ''' Process the date information for `PageParser` to use
     '''
@@ -35,8 +36,7 @@ class DateProcessor(object):
         assert isinstance(daysago, int)
         daysdelta = datetime.timedelta(daysago)
         today = datetime.date.today()
-        return today - daysdelta
-    
+        return today - daysdelta    
     
 class Period:
     Daily = 'Daily'
@@ -77,7 +77,7 @@ class PageParser(object):
             if response.status_code == 200:
                 return response.text
             else:
-                raise requests.exceptions.HTTPError("Not Return OK!")
+                raise requests.exceptions.HTTPError("Not Successfully Respond!")
         else:
             import urllib, urllib2
             payload = urllib.urlencode(self.postdict)
@@ -105,20 +105,41 @@ class PageParser(object):
             fout.write(htmldoc)
         logger.info("write data to %s" % (filepath,))
         
-    def extract_info(self):
-        #TODO: use re, lxml or BeautifulSoup to extracted the data
-        raise NotImplementedError("Not implemented!")    
-    def to_json(self):
-        raise NotImplementedError("Not implemented!")
-    def write_to_csv(self, csvfilepath):
-        raise NotImplementedError("Not implemented!")
-    
-
-
+    def extract_info(self, htmlstr):
+        try:
+            import lxml.html.soupparser as soupparser
+        except ImportError as e:
+            logger.error("Import lxml error:"+repr(e))
+            raise e
+        dom = soupparser.fromstring(htmlstr)
+        ths = dom.xpath('div/table/thead/tr/th/text()')
+        trs = dom.xpath('div/table/tbody/tr')
+        data = []
+        for e in trs[:-1]:
+            data.append(e.xpath('td/text()'))
+        
+        statistic_headers = trs[-1].xpath('td/text()')
+        statistic_values = trs[-1].xpath('td/span/text()')
+        return {'data':{'titles':ths, 'values':data}, 'stats':{'titles':statistic_headers, 'values':statistic_values}} 
+               
+    def write_to_csv(self, info, csvfilepath=None):
+        import csv        
+        if csvfilepath is None:
+            htmlfilename = "%s-%s-%s" % (self.postdict['st_date'], self.postdict['end_date'], self.postdict['interval_sec'])
+            csvfilepath = htmlfilename.replace('/', '-') + ".csv"
+        with open(csvfilepath, 'wt') as f:
+            writer = csv.writer(f)
+            writer.writerow(info['data']['titles'])
+            for row in info['data']['values']:
+                writer.writerow(row)
+        logger.info("write to %s" % (csvfilepath,))
+        
 def main():
-    parser = PageParser(st_date='01/01/2014') # util today
+    parser = PageParser(st_date='01/04/2007') # util today
     htmlstr = parser.get_html()
     parser.write_to_html(htmlstr)
+    info = parser.extract_info(htmlstr)
+    parser.write_to_csv(info)
 
 if __name__ == '__main__':
     main()
